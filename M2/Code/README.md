@@ -9,7 +9,7 @@ Emergency-vehicle (EV) sensing and alerting system built on top of OpenISAC link
 | `config/system.yaml` | single source of truth (graph, nodes, ports, thresholds) |
 | `isacv2x/common` | config, packet formats (CRC32 framing), JSONL event log |
 | `isacv2x/backends` | OpenISAC UDP data plane, in-process lossy loopback |
-| `isacv2x/density` | beacon counter, radar counter (optional, needs numpy), synthetic generator, estimator factory |
+| `isacv2x/density` | beacon counter, synthetic generator, estimator factory, incomplete radar counter (optional, needs numpy) |
 | `isacv2x/routing` | road graph, Dijkstra, A*, replanner with deadline check |
 | `isacv2x/alert` | transmitter (repeats), relay fan-out, receiver (de-dup, outcomes) |
 | `isacv2x/eval` | pdr, density_validation, replan, latency (+ time saved), signal_id, report (Table II) |
@@ -48,7 +48,7 @@ Exit code is 0 if no criterion fails, 1 if one does, 2 on an unsupported config.
 
 The overlays set 2.4 GHz TDD with uplink on, our UDP/ZMQ ports, and three moving scatterers
 for the radar counter. A test checks that their ports and frequency match `system.yaml`.
-This stack has not been run here (OpenISAC was not built); the launch order and keys come
+This stack has not been run here (we could not build OpenISAC fully); the launch order and keys come
 from the OpenISAC docs. Payload path: BS in 50000 -> UE out 50001; UE in 50002 -> BS out 50003.
 
 ## Moving to hardware
