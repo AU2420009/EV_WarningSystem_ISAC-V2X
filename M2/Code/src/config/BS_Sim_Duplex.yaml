@@ -1,0 +1,52 @@
+# OVERLAY for OpenISAC's BS_Sim_Duplex.yaml (ChannelSimulator, TDD uplink on).
+#
+# This is NOT a full BS config. It holds only the keys this project depends on, each taken
+# from the OpenISAC BS YAML reference. scripts/run_sim_stack.sh merges it over the upstream
+# file (config/BS_Sim_Duplex.yaml in the OpenISAC repo) to produce build/BS.yaml, so every
+# other upstream setting is kept. Keep ports in sync with config/system.yaml (a test checks).
+
+radio:
+  radio_backend: sim
+
+rf_sampling:
+  sample_rate: 20000000          # matches system.yaml radio.sample_rate_hz (c/2B = 7.5 m)
+  bandwidth: 20000000
+
+simulation:
+  session: oisac_sim             # must match UE.yaml
+  enable_comm_rx: true
+  enable_sensing_rx: true
+  enable_uplink: true            # BS_Sim_Duplex.yaml upstream also sets this
+  pacing_enabled: true
+  noise_power_dbfs: -70
+  # Moving scatterers for the radar counter (monostatic). Fields per the docs.
+  targets:
+    - {range_m: 120, velocity_mps: 10,  gain_db: 0, angle_deg: 0}
+    - {range_m: 200, velocity_mps: -8,  gain_db: 0, angle_deg: 0}
+    - {range_m: 320, velocity_mps: 12,  gain_db: -3, angle_deg: 0}
+
+downlink:
+  center_freq: 2400000000        # system.yaml radio.center_freq_hz
+
+uplink:
+  enabled: true                  # off by default upstream; needed for the ACK/uplink path
+  duplex_mode: tdd
+  symbol_start: 90
+  symbol_count: 10
+  guard_symbols: 1
+
+sensing:
+  rx_channel_count: 1
+  range_fft_size: 1024
+  doppler_fft_size: 100
+  output_mode: dense
+  on_wire_format: complex_float32
+  symbol_stride: 20
+
+network_output:
+  udp_input_port: 50000          # system.yaml openisac.bs_udp_in   (payload into BS)
+  udp_output_ip: 127.0.0.1
+  udp_output_port: 50003         # system.yaml openisac.bs_udp_out  (decoded uplink)
+  mono_sensing_output_enabled: true
+  mono_sensing_port: 8888        # system.yaml openisac.zmq_monostatic
+  control_port: 9999             # system.yaml openisac.zmq_bs_control

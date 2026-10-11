@@ -1,0 +1,38 @@
+# OVERLAY for OpenISAC's UE_Sim_Duplex.yaml. See BS_Sim_Duplex.yaml for how overlays work.
+# Must be used as a pair with the BS overlay (same session, duplex mode and TDD window).
+
+radio:
+  radio_backend: sim
+
+simulation:
+  session: oisac_sim
+  enable_comm_rx: true
+  enable_sensing_rx: true
+  enable_uplink: true
+  pacing_enabled: true
+
+downlink:
+  center_freq: 2400000000
+
+uplink:
+  enabled: true
+  duplex_mode: tdd               # must match BS
+  symbol_start: 90
+  symbol_count: 10
+  guard_symbols: 1
+
+sensing:
+  bi_enabled: true
+  range_fft_size: 1024
+  doppler_fft_size: 100
+  output_mode: dense
+  on_wire_format: complex_float32
+  symbol_stride: 20
+
+network_output:
+  udp_input_port: 50002          # system.yaml openisac.ue_udp_in   (payload into UE -> uplink)
+  udp_output_ip: 127.0.0.1
+  udp_output_port: 50001         # system.yaml openisac.ue_udp_out  (decoded downlink)
+  bi_sensing_output_enabled: true
+  bi_sensing_port: 8889          # system.yaml openisac.zmq_bistatic
+  control_port: 10001            # system.yaml openisac.zmq_ue_control

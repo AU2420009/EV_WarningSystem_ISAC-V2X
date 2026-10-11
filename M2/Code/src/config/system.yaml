@@ -1,0 +1,92 @@
+# ISAC-V2X system configuration (single source of truth for all modules).
+# Loaded and validated by isacv2x/common/config.py.
+
+project:
+  name: isac-v2x
+  seed: 42                      # for synthetic density / simulated loss
+
+radio:
+  center_freq_hz: 2.4e+9        # report says 5.8/5.9 GHz; OpenISAC TDD presets run at 2.4 GHz.
+                                # Kept configurable: see regulatory note in README.
+  duplex: TDD
+  sample_rate_hz: 20.0e+6       # B210-friendly; monostatic range resolution = c/2B = 7.5 m
+
+# Ports of the (untouched) OpenISAC BS/UE executables, per its docs.
+# Verify against your BS/UE YAML before running on hardware.
+openisac:
+  host: 127.0.0.1
+  bs_udp_in: 50000              # payload into BS (downlink) -> decoded at UE
+  ue_udp_out: 50001
+  ue_udp_in: 50002              # payload into UE (uplink)   -> decoded at BS
+  bs_udp_out: 50003
+  zmq_monostatic: 8888          # BS range-Doppler publisher
+  zmq_bistatic: 8889            # UE sensing publisher
+  zmq_bs_control: 9999
+  zmq_ue_control: 10001
+
+# Road network. Junctions are graph vertices (x, y in metres, used by A* heuristic).
+junctions:
+  J1: {x: 0,    y: 0}
+  J2: {x: 400,  y: 0}
+  J3: {x: 800,  y: 0}
+  J4: {x: 0,    y: 300}
+  J5: {x: 400,  y: 300}
+  J6: {x: 800,  y: 300}
+
+# Road segments = graph edges. capacity_veh = vehicle count regarded as fully congested
+# (used to normalise density into 0..1).
+segments:
+  - {id: S12, from: J1, to: J2, length_m: 400, capacity_veh: 20}
+  - {id: S23, from: J2, to: J3, length_m: 400, capacity_veh: 20}
+  - {id: S45, from: J4, to: J5, length_m: 400, capacity_veh: 20}
+  - {id: S56, from: J5, to: J6, length_m: 400, capacity_veh: 20}
+  - {id: S14, from: J1, to: J4, length_m: 300, capacity_veh: 15}
+  - {id: S25, from: J2, to: J5, length_m: 300, capacity_veh: 15}
+  - {id: S36, from: J3, to: J6, length_m: 300, capacity_veh: 15}
+bidirectional: true
+
+# Sensing / relay nodes. role: rsu (counts beacons) or relay (counts + forwards).
+# backend: openisac (real or ChannelSimulator) | virtual (UDP/ZMQ software node).
+nodes:
+  - {id: RSU1, role: rsu,   segment: S12, backend: openisac, host: 127.0.0.1, port: 50000}
+  - {id: RLY1, role: relay, segment: S23, backend: virtual,  host: 127.0.0.1, port: 52001}
+  - {id: RLY2, role: relay, segment: S25, backend: virtual,  host: 127.0.0.1, port: 52002}
+  - {id: RLY3, role: relay, segment: S45, backend: virtual,  host: 127.0.0.1, port: 52003}
+
+# Civilian vehicles / nodes that receive the "make way" alert.
+receivers:
+  - {id: RX1, host: 127.0.0.1, port: 53001}
+  - {id: RX2, host: 127.0.0.1, port: 53002}
+  - {id: RX3, host: 127.0.0.1, port: 53003}
+
+density:
+  method: beacon_counter        # beacon_counter | radar_counter | synthetic
+  interval_s: 1.0               # measurement window
+  beacon_ttl_s: 2.0             # a beacon counts as active if seen within this window
+  smoothing_alpha: 0.5          # EMA weight on newest measurement (1.0 = no smoothing)
+
+routing:
+  algorithm: astar              # dijkstra | astar
+  congestion_weight: 3.0        # cost = length * (1 + weight * density_norm ** exponent)
+  congestion_exponent: 2.0
+  replan_min_change: 0.1        # only replan if some segment's norm. density changed by this much
+  replan_deadline_s: 0.5        # "reasonable window" criterion from the report
+
+alert:
+  preamble_hex: "A5C3E17B"      # EV identification preamble (signal-ID false-positive/negative eval)
+  ev_id: 1
+  priority: 7
+  repeat: 3                     # redundancy; broadcast has no ACK in the report's design
+  repeat_gap_s: 0.05
+  max_payload_bytes: 256
+
+eval:
+  pdr_target: 0.90
+  min_receiving_nodes: 3
+  min_density_scenarios: 2
+  log_dir: logs
+  # Optional thresholds (placeholders until the team fixes numbers; see EvalCfg).
+  density_mae_tol: 1.0          # mean |estimate - manual count|, vehicles per segment
+  alert_latency_p95_s: 0.100    # 95th-percentile alert latency
+  signal_id_max_fn: 0.05        # EV alerts missed by the identifier
+  signal_id_max_fp: 0.01        # non-EV frames accepted as EV alerts
