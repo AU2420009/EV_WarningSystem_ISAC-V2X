@@ -27,12 +27,15 @@ from dataclasses import dataclass, field
 VERSION = 1
 TYPE_BEACON = 1
 TYPE_ALERT = 2
+TYPE_FEEDBACK = 3
 
 _HDR = struct.Struct(">BBH")          # version, type, length
 _CRC = struct.Struct(">I")
 _BEACON_FIXED = struct.Struct(">IIQ")  # vehicle_id, seq, timestamp_us
 _BEACON_TAIL = struct.Struct(">ff")    # offset_m, speed_mps
-_ALERT_FIXED = struct.Struct(">HBIQ")  # ev_id, priority, seq, timestamp_us
+_ALERT_FIXED = struct.Struct(">HBIQ")
+
+_FEEDBACK_FIXED = struct.Struct(">IQf")  # seq, timestamp_us, congestion_level  # ev_id, priority, seq, timestamp_us
 
 
 # ------------------------------------------------------------------- errors
@@ -106,7 +109,16 @@ class Alert:
     timestamp_us: int = field(default_factory=now_us)
 
 
-Message = Beacon | Alert
+@dataclass(frozen=True)
+class RouteFeedback:
+    rsu_id: str
+    seq: int
+    route: tuple[str, ...]                # recommended route segments
+    congestion_level: float = 0.0        # normalized congestion (0.0..1.0)
+    timestamp_us: int = field(default_factory=now_us)
+
+
+Message = Beacon | Alert | RouteFeedback
 
 
 # ------------------------------------------------------------------ encoding
@@ -131,6 +143,14 @@ def encode(msg: Message, preamble: bytes, max_bytes: int | None = None) -> bytes
                    + bytes([len(msg.route)])
                    + b"".join(_enc_str(s) for s in msg.route))
         mtype = TYPE_ALERT
+    elif isinstance(msg, RouteFeedback):
+        if not msg.route or len(msg.route) > 255:
+            raise PacketError("feedback route must contain 1-255 segments")
+        payload = (_enc_str(msg.rsu_id)
+                   + _FEEDBACK_FIXED.pack(msg.seq, msg.timestamp_us, msg.congestion_level)
+                   + bytes([len(msg.route)])
+                   + b"".join(_enc_str(s) for s in msg.route))
+        mtype = TYPE_FEEDBACK
     else:
         raise TypeError(f"cannot encode {type(msg).__name__}")
     data = _frame(preamble, mtype, payload)
@@ -151,7 +171,7 @@ def peek_type(data: bytes, preamble: bytes) -> int | None:
     if not data.startswith(preamble) or len(data) < n + _HDR.size:
         return None
     version, mtype, _ = _HDR.unpack_from(data, n)
-    if version != VERSION or mtype not in (TYPE_BEACON, TYPE_ALERT):
+    if version != VERSION or mtype not in (TYPE_BEACON, TYPE_ALERT, TYPE_FEEDBACK):
         return None
     return mtype
 
@@ -196,6 +216,20 @@ def decode(data: bytes, preamble: bytes) -> Message:
             if pos != len(payload):
                 raise Truncated("trailing bytes in alert payload")
             return Alert(ev, pri, seq, tuple(route), ts)
+        if mtype == TYPE_FEEDBACK:
+            rsu_id, pos = _dec_str(payload, 0)
+            seq, ts, cong = _FEEDBACK_FIXED.unpack_from(payload, pos)
+            pos += _FEEDBACK_FIXED.size
+            if pos >= len(payload):
+                raise Truncated("route count missing in feedback")
+            count, pos = payload[pos], pos + 1
+            route = []
+            for _ in range(count):
+                s, pos = _dec_str(payload, pos)
+                route.append(s)
+            if pos != len(payload):
+                raise Truncated("trailing bytes in feedback payload")
+            return RouteFeedback(rsu_id, seq, tuple(route), cong, ts)
     except struct.error as e:
         raise Truncated(str(e)) from e
     raise UnknownType(f"type {mtype}")

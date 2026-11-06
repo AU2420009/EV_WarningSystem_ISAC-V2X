@@ -58,7 +58,7 @@ def run_civilian(cfg_path: str, rate: float, segment: str):
                 print(f"  -> TX Beacon: vid={b.vehicle_id} seq={b.seq} seg={b.segment} off={b.offset_m:.1f}m")
 
             # Check for incoming Emergency Alerts
-            dg = rx.recv()
+            dg = rx.recv(timeout=0.05)
             if dg is not None:
                 try:
                     msg = P.decode(dg.data, cfg.alert.preamble)
@@ -102,7 +102,7 @@ def run_rsu(cfg_path: str):
         while True:
             # Drain incoming packets
             while True:
-                dg = rx.recv()
+                dg = rx.recv(timeout=0.005)
                 if dg is None:
                     break
                 status = counter.ingest_bytes(dg.data, dg.rx_time, node_id="RSU1")
@@ -166,7 +166,7 @@ def run_ev(cfg_path: str):
                 tx.send(raw)
                 print(f"  -> TX Siren Alert #{seq}: EV #1 Priority 1 | Route: {' -> '.join(planned_route)}")
 
-            dg = rx.recv()
+            dg = rx.recv(timeout=0.05)
             if dg is not None:
                 try:
                     msg = P.decode(dg.data, cfg.alert.preamble)
@@ -194,7 +194,7 @@ def run_receiver(cfg_path: str):
 
     try:
         while True:
-            dg = rx.recv()
+            dg = rx.recv(timeout=0.05)
             if dg is not None:
                 try:
                     msg = P.decode(dg.data, cfg.alert.preamble)

@@ -84,3 +84,10 @@ def test_speed_from_beacons():
     assert P.speed_from_beacons(b, other_seg) is None    # segment change
     other_veh = P.Beacon(6, 2, "S12", 25.0, timestamp_us=2_000_000)
     assert P.speed_from_beacons(a, other_veh) is None
+
+
+def test_feedback_roundtrip():
+    rf = P.RouteFeedback("RSU1", 1, ("S12", "S25"), 0.75, timestamp_us=999)
+    out = P.decode(P.encode(rf, PRE), PRE)
+    assert out == rf
+    assert P.peek_type(P.encode(rf, PRE), PRE) == P.TYPE_FEEDBACK

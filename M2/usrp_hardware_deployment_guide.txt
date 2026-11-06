@@ -1,0 +1,174 @@
+================================================================================
+ISAC-V2X TESTBED: THREE-NODE USRP B210 HARDWARE DEPLOYMENT GUIDE
+================================================================================
+
+PROJECT: Emergency Vehicle Sensing and Communication Network (ISAC-V2X)
+COURSE : ECE310 - Wireless Communications, Ahmedabad University
+CARRIER: 2.4 GHz | BANDWIDTH: 20 MHz | CHANNELS: TDD Duplex
+
+--------------------------------------------------------------------------------
+NETWORK ARCHITECTURE & ROLE ASSIGNMENTS
+--------------------------------------------------------------------------------
+Node 1 (USRP 1) -> EMERGENCY VEHICLE (EV)
+                   * Mobile responder driving through the road grid.
+                   * Operates as OpenISAC User Equipment (UE).
+                   * Listens on Downlink for RSU RouteFeedback; broadcasts Alert.
+
+Node 2 (USRP 2) -> ROADSIDE UNIT (RSU)
+                   * Stationary edge infrastructure mounted at Junction J2.
+                   * Operates as OpenISAC Base Station (BS).
+                   * Listens on Uplink for Beacons; runs A* routing; broadcasts Feedback.
+
+Node 3 (USRP 3) -> CIVILIAN VEHICLE (CV)
+                   * Regular commuter vehicle on road segment S12.
+                   * Operates as OpenISAC User Equipment (UE).
+                   * Transmits Poisson-distributed beacons; listens for Emergency Alerts.
+
+================================================================================
+SECTION 1: NODE 1 - EMERGENCY VEHICLE (USRP 1 / EV)
+================================================================================
+
+1.1 Physical Hardware & Cabling:
+    - Connect USRP 1 to a blue USB 3.0 port on Laptop #1.
+    - Connect the 6V DC external power brick (do not use bus power).
+    - Attach 2.4 GHz vertical antenna to Channel A [TX/RX] (Alert Transmit).
+    - Attach 2.4 GHz vertical antenna to Channel A [RX2]   (Feedback Receive).
+    - Identify serial number via: "C:\Program Files\UHD\bin\uhd_find_devices.exe"
+
+1.2 Configuration Profile:
+    - Open: config/UE_Hardware_Duplex.yaml
+    - Set radio parameters:
+        radio:
+          radio_backend: uhd
+          args: "serial=<SERIAL_OF_USRP_1>"
+        downlink:
+          center_freq: 2400000000
+          antenna: "RX2"
+          rx_gain: 25.0
+        uplink:
+          center_freq: 2400000000
+          antenna: "TX/RX"
+          tx_gain: 40.0
+
+1.3 Execution Steps:
+    Step 1 (Baseband Modem):
+        Open Terminal 1 on Laptop #1:
+        cd ~/OpenISAC
+        ./build/UE config/UE_Hardware_Duplex.yaml
+        Verify terminal shows: "[B200] Operating over USB 3" and syncs.
+
+    Step 2 (Alert & Route Listener):
+        Open Terminal 2 on Laptop #1:
+        cd "c:\Users\manas\Desktop\Important Folders\ECE310 Project\M2\Code\src"
+        python scripts/b210_bench_test.py --role ev
+        Terminal will broadcast Siren Alerts on UDP 50002 and listen on UDP 50001 for RSU RouteFeedback.
+
+================================================================================
+SECTION 2: NODE 2 - ROADSIDE UNIT (USRP 2 / RSU)
+================================================================================
+
+2.1 Physical Hardware & Cabling:
+    - Connect USRP 2 to a blue USB 3.0 port on Laptop #2.
+    - Connect the 6V DC external power brick.
+    - Attach 2.4 GHz vertical antenna to Channel A [RX2]   (Beacon Ingest).
+    - Attach 2.4 GHz vertical antenna to Channel A [TX/RX] (Feedback Broadcast).
+    - Identify serial number via: "C:\Program Files\UHD\bin\uhd_find_devices.exe"
+
+2.2 Configuration Profile:
+    - Open: config/BS_Hardware_Duplex.yaml
+    - Set radio parameters:
+        radio:
+          radio_backend: uhd
+          args: "serial=<SERIAL_OF_USRP_2>"
+        downlink:
+          center_freq: 2400000000
+          antenna: "TX/RX"
+          tx_gain: 40.0
+        uplink:
+          enabled: true
+          antenna: "RX2"
+          rx_gain: 25.0
+
+2.3 Execution Steps:
+    Step 1 (Baseband Modem):
+        Open Terminal 1 on Laptop #2:
+        cd ~/OpenISAC
+        ./build/BS config/BS_Hardware_Duplex.yaml
+        Verify terminal outputs: "Uplink enabled: true" and opens UDP ports.
+
+    Step 2 (Density Counter + A* Router):
+        Open Terminal 2 on Laptop #2:
+        cd "M2/Code/src"
+        python scripts/b210_bench_test.py --role rsu --config config/system.yaml
+        Terminal will output live vehicle counts and recalculate the detour path
+        whenever traffic density shifts by more than 10%.
+
+================================================================================
+SECTION 3: NODE 3 - CIVILIAN VEHICLE (USRP 3 / CV)
+================================================================================
+
+3.1 Physical Hardware & Cabling:
+    - Connect USRP 3 to a blue USB 3.0 port on Laptop #3.
+    - Connect the 6V DC external power brick.
+    - Attach 2.4 GHz vertical antenna to Channel A [TX/RX] (Beacon Transmit).
+    - Attach 2.4 GHz vertical antenna to Channel A [RX2]   (Alert Receive).
+    - Identify serial number via: "C:\Program Files\UHD\bin\uhd_find_devices.exe"
+
+3.2 Configuration Profile:
+    - Open: config/UE_Hardware_Duplex.yaml
+    - Set radio parameters:
+        radio:
+          radio_backend: uhd
+          args: "serial=<SERIAL_OF_USRP_3>"
+        uplink:
+          antenna: "TX/RX"
+          tx_gain: 40.0
+        downlink:
+          antenna: "RX2"
+          rx_gain: 25.0
+
+3.3 Execution Steps:
+    Step 1 (Baseband Modem):
+        Open Terminal 1 on Laptop #3:
+        cd ~/OpenISAC
+        ./build/UE config/UE_Hardware_Duplex.yaml
+
+    Step 2 (Poisson Traffic Generator):
+        Open Terminal 2 on Laptop #3:
+        cd "M2/Code/src"
+        python scripts/b210_bench_test.py --role civilian --rate 0.8 --segment S12
+        This simulates Poisson vehicle arrivals on Street S12 (rate = 0.8 veh/s),
+        transmitting real over-the-air beacons to USRP 2.
+
+    Step 3 (Civilian Dashboard Alert Receiver):
+        Open Terminal 3 on Laptop #3:
+        cd "M2/Code/src"
+        python scripts/b210_bench_test.py --role receiver
+        Displays "EMERGENCY ALERT: PULL OVER" when an alert is broadcast.
+
+================================================================================
+SECTION 4: COMPLETE CLOSED-LOOP DEMO EXECUTION ORDER
+================================================================================
+
+1. START RSU (Node 2):
+   Launch OpenISAC BS, then run `b210_bench_test.py --role rsu`.
+   RSU begins monitoring road traffic (initial count = 0).
+
+2. START CIVILIAN VEHICLE (Node 3):
+   Launch OpenISAC UE, then run `b210_bench_test.py --role civilian --rate 1.0`.
+   Civilian USRP blasts beacons over the air; RSU receives them and increments
+   segment S12 vehicle count past the congestion threshold (15+ vehicles).
+
+3. RSU ADAPTS ROUTE:
+   The RSU detects gridlock on S12, executes A* pathfinding, and switches the
+   optimal route from (S12 -> S23 -> S36) to detour (S14 -> S45 -> S56).
+   RSU broadcasts RouteFeedback over the air.
+
+4. EMERGENCY VEHICLE RECEIVES ADVICE (Node 1):
+   EV laptop decodes RouteFeedback over USRP 1 and updates its navigation map.
+
+5. EMERGENCY VEHICLE ALERTS CIVILIAN CARS:
+   EV broadcasts "Make Way" alert along the detour route; Civilian USRP 3
+   decodes the alert and flashes warning on the driver's screen.
+================================================================================
+

@@ -18,6 +18,9 @@ def make_estimator(cfg: SystemConfig, *, keyframes: Sequence[Keyframe] | None = 
         if not keyframes:
             raise ValueError("density.method 'synthetic' needs keyframes")
         return SyntheticDensity(cfg, keyframes, noise_std=noise_std, smooth=True)
+    if method == "poisson":
+        from isacv2x.density.poisson import PoissonDensityEstimator
+        return PoissonDensityEstimator(cfg)
     if method == "radar_counter":
         try:
             from isacv2x.density.radar_counter import RadarCounter

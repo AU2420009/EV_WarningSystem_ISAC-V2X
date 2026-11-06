@@ -1,0 +1,146 @@
+================================================================================
+ISAC-V2X EMERGENCY VEHICLE WARNING SYSTEM
+Milestone 2: Team Debrief Guide & Technical Vocabulary
+================================================================================
+
+--------------------------------------------------------------------------------
+PART 1: BUZZWORDS & PLAIN-ENGLISH DEFINITIONS
+--------------------------------------------------------------------------------
+
+1. ISAC (Integrated Sensing and Communications)
+   Using the exact same radio wave and transceiver hardware to both locate/sense
+   physical targets (like radar) and transmit data packets (like Wi-Fi/cellular),
+   rather than carrying two separate antennas and radio subsystems.
+
+2. V2X (Vehicle-to-Everything)
+   The umbrella term for vehicular wireless communication, including Vehicle-to-
+   Vehicle (V2V), Vehicle-to-Infrastructure (V2I / RSU), and Vehicle-to-Pedestrian
+   (V2P).
+
+3. RSU (Roadside Unit)
+   A stationary wireless transceiver mounted along the road (e.g., on a traffic
+   pole) that collects beacon signals from passing cars and relays emergency alerts.
+
+4. OBU (On-Board Unit)
+   The mobile communication box installed inside a vehicle (the ambulance or
+   civilian car) that transmits beacons and receives emergency warnings.
+
+5. PDR (Packet Delivery Ratio)
+   The percentage of transmitted radio messages that arrive successfully at the
+   receiver without bit errors. The project milestone target is >= 90%.
+
+6. OFDM (Orthogonal Frequency Division Multiplexing)
+   A digital modulation scheme that splits high-speed data across hundreds of
+   tightly spaced, non-interfering subcarrier frequencies. It forms the foundation
+   of modern Wi-Fi, 5G, and OpenISAC.
+
+7. Zadoff-Chu (ZC) Sequence
+   A specialized mathematical sequence transmitted at the start of an OFDM frame.
+   It has constant amplitude and ideal autocorrelation, allowing the receiver to
+   detect frame boundaries and synchronize timing even in noisy environments.
+
+8. LDPC (Low-Density Parity-Check)
+   A powerful error-correction coding method that adds redundant check bits to
+   the data payload, enabling the receiver to detect and fix bit flips caused
+   by wireless noise.
+
+9. Range-Doppler Map
+   A 2D radar image produced by computing an FFT across subcarriers (distance/range)
+   and across successive OFDM symbols (velocity/Doppler shift). Moving cars appear
+   as bright peaks on this map.
+
+10. MTI (Moving Target Indication)
+    A radar signal processing filter that removes static clutter (buildings, trees,
+    guardrails) by notching out zero-Doppler frequencies, leaving only moving
+    vehicles visible.
+
+11. A* vs. Dijkstra Routing
+    Shortest-path algorithms on graphs. Dijkstra evaluates road options outward
+    in all directions uniformly. A* uses a distance heuristic (straight-line
+    distance to the hospital) to prioritize paths pointing toward the destination,
+    running significantly faster.
+
+12. Dynamic Congestion Penalty
+    The formula used in code to inflate road travel cost based on vehicle density:
+    Cost = Length * (1 + Weight * NormalizedDensity^Exponent). As density rises,
+    the route optimizer routes the ambulance around that road segment.
+
+13. CRC32 (Cyclic Redundancy Check 32-bit)
+    A 4-byte checksum appended to every transmitted packet. If even a single bit
+    is corrupted in transit, the receiver discards the packet to prevent false
+    alerts.
+
+14. USRP B210
+    A Software-Defined Radio (SDR) hardware board from Ettus Research that converts
+    software bytes into real 2.4 GHz radio frequency waveforms over physical
+    antennas.
+
+15. Loopback Simulation
+    A virtual test channel running inside CPU memory rather than over antennas. It
+    simulates packet loss with a random seed so the routing and alerting logic
+    can be proven before touching physical radios.
+
+
+--------------------------------------------------------------------------------
+PART 2: SYSTEM ARCHITECTURE (HOW TO EXPLAIN THE CODE TO YOUR TEAM)
+--------------------------------------------------------------------------------
+
+1. THE BIG PICTURE (WHAT THE CODE DOES IN 30 SECONDS)
+   Our code runs a closed loop:
+   Ambulance wants to reach destination -> Roadside nodes count nearby cars ->
+   The router detects traffic jams and calculates the fastest path -> The
+   ambulance broadcasts a "make way" radio alert to cars on that path.
+
+2. CODEBASE MODULE BREAKDOWN
+   The code is structured into 6 modular layers under src/:
+
+   - config/system.yaml:
+     The single source of truth for the entire system. It defines the map layout
+     (junction coordinates J1-J6, road lengths S12-S36), radio carrier frequency
+     (2.4 GHz), bandwidth (20 MHz), UDP network ports, and evaluation pass/fail
+     thresholds.
+
+   - isacv2x/common/ (Data Formatting & Logging):
+     * packets.py: Defines the exact byte layout of 'Beacon' and 'Alert' packets.
+       Every packet starts with a 4-byte preamble (0xA5C3E17B) and ends with a
+       CRC32 checksum.
+     * config.py: Reads and validates system.yaml.
+     * logging_utils.py: Records every event into a JSONL log file for evaluation.
+
+   - isacv2x/density/ (Traffic Estimators):
+     * beacon_counter.py (Primary / Milestone 2): Roadside units listen for periodic
+       beacons broadcast by cars. It tracks vehicle IDs within a 2-second sliding
+       window to estimate how many vehicles occupy each road segment.
+     * radar_counter.py (Secondary / Future): Uncooperative radar mode that counts
+       moving vehicles from OpenISAC Range-Doppler maps without needing cars to
+       broadcast beacons.
+
+   - isacv2x/routing/ (Pathfinding Engine):
+     * graph.py: Represents the city road network as vertices and weighted edges.
+     * replanner.py: Monitors road congestion. If any road's traffic changes by
+       more than 10%, it recomputes the optimal route using A* (astar.py) or
+       Dijkstra (dijkstra.py). Path recomputation takes less than 0.1 milliseconds.
+
+   - isacv2x/alert/ (Emergency Warning Broadcast):
+     * transmitter.py: Encodes the emergency vehicle ID, priority level, and
+       chosen route segments into an alert frame, repeating it 3 times for
+       reliability.
+     * relay.py: Simulates roadside relay nodes forwarding the alert along the
+       corridor.
+     * receiver.py: Runs on civilian cars, verifies the packet checksum, rejects
+       corrupted frames, and records receipt latency.
+
+   - isacv2x/eval/ and scripts/run_demo.py (Evaluation & Verification):
+     * run_demo.py executes a full scenario across 3 traffic phases (light, one
+       road jammed, two roads jammed).
+     * It logs every event and calculates Packet Delivery Ratio (PDR), latency,
+       density accuracy, route adaptability, and false-positive/negative rates,
+       printing out the Milestone evaluation report table.
+
+3. HOW TO RUN THE CODE FOR YOUR TEAM
+   Open a terminal in M2/Code/src/ and run:
+       python scripts/run_demo.py --out logs
+   The terminal will print the exact pass/fail table corresponding to Table II
+   and Table III in our Milestone 2 evaluation report.
+================================================================================
+
