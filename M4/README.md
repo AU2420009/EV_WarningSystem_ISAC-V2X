@@ -50,10 +50,9 @@ Details and caveats are in the final report and in `M3/Code/docs/CAVEATS.md`.
 |---|---|
 | `M1/` | Milestone 1 report (concept, literature, targets) and video link |
 | `M2/` | Milestone 2 report, video link, code snapshot (`M2/Code`), hardware deployment guide, team debrief notes |
-| `M3/Code/` | Milestone 3 code snapshot: the `isacv2x` package, scripts, configs, tests, logs. See `M3/Code/README.md` for the module map |
-| `M3/Code/docs/CAVEATS.md` | What the code does and does not cover; read before quoting any result |
+| `M3/Code/` | Milestone 3 code update: the `isacv2x` package, scripts, configs, tests, logs. See `M3/Code/README.md` for the module map |
+| `M4` | Final submission; including a report, video and code for the final project update |
 
-The M2 and M3 code folders are identical apart from the committed demo logs in M3.
 
 ## Quick start
 
