@@ -1,0 +1,43 @@
+# Hardware overlay for OpenISAC on USRP B210 (Civilian Vehicle / UE Node).
+# Configured for 2.4 GHz TDD with real UHD hardware driver.
+
+radio:
+  radio_backend: uhd
+  args: "serial=3107348"
+  clock_source: internal
+  time_source: internal
+
+rf_sampling:
+  sample_rate: 20000000        # matches system.yaml radio.sample_rate_hz (20 MHz)
+  bandwidth: 20000000
+
+downlink:
+  center_freq: 2400000000      # 2.4 GHz carrier
+  rx_gain: 25.0                # dB
+  antenna: "RX2"
+
+uplink:
+  enabled: true
+  duplex_mode: tdd
+  tx_gain: 40.0                # dB
+  antenna: "TX/RX"
+  symbol_start: 90
+  symbol_count: 10
+  guard_symbols: 1
+
+sensing:
+  bi_enabled: true
+  range_fft_size: 1024
+  doppler_fft_size: 100
+  output_mode: dense
+  on_wire_format: complex_float32
+ symbol_stride: 20
+
+network_output:
+  udp_input_port: 50002        # payload into UE (civilian beacons from Python to USRP TX)
+  udp_output_ip: 127.0.0.1
+  udp_output_port: 50001       # decoded downlink (emergency alerts from USRP RX to Python)
+  bi_sensing_output_enabled: true
+  bi_sensing_port: 8889
+  control_port: 10001
+

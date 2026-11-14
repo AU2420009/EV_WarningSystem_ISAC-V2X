@@ -1,0 +1,43 @@
+# Hardware overlay for OpenISAC on USRP B210 (Base Station / RSU Node).
+# Configured for 2.4 GHz TDD with real UHD hardware driver.
+
+radio:
+  radio_backend: uhd
+  args: "serial=3107348"
+  clock_source: internal       # change to 'gpsdo' if external GPS antenna has lock
+  time_source: internal        # change to 'gpsdo' if external GPS antenna has lock
+
+rf_sampling:
+  sample_rate: 20000000        # matches system.yaml radio.sample_rate_hz (20 MHz, c/2B = 7.5 m)
+  bandwidth: 20000000
+
+downlink:
+  center_freq: 2400000000      # 2.4 GHz carrier
+  tx_gain: 40.0                # dB (moderate gain for bench testing)
+  antenna: "TX/RX"
+
+uplink:
+  enabled: true                # mandatory for RSU to receive civilian beacons
+  duplex_mode: tdd
+  rx_gain: 25.0                # dB
+  antenna: "RX2"
+  symbol_start: 90
+  symbol_count: 10
+  guard_symbols: 1
+
+sensing:
+  rx_channel_count: 1
+  range_fft_size: 1024
+  doppler_fft_size: 100
+  output_mode: dense
+  on_wire_format: complex_float32
+  symbol_stride: 20
+
+network_output:
+  udp_input_port: 50000        # payload into BS (downlink alert from Python)
+  udp_output_ip: 127.0.0.1
+  udp_output_port: 50003       # decoded uplink (civilian beacons out to Python)
+  mono_sensing_output_enabled: true
+  mono_sensing_port: 8888      # range-Doppler ZMQ publisher
+  control_port: 9999
+
